@@ -16,6 +16,8 @@ Automated character generation and key spamming tool for Windows, with a modern,
 ### 🎨 Formatting
 - Add dashes or spaces every N characters
 - Customizable frequency for both options
+ - Advanced dash patterns: specify group tokens like `11-11111-1111` or literal tokens like `ABC-1111-XYZ`
+ - Per-gap entries: enable one text box per gap and type literal values for each gap (when enabled, the "Characters per gap" control is ignored; use the Pattern field for numeric group sizes)
 
 ### 🗑️ Deletion
 - Auto-delete: automatically delete after typing
@@ -33,6 +35,7 @@ Automated character generation and key spamming tool for Windows, with a modern,
 - Typing speed slider: smooth logarithmic scale up to 10,000 cps
 - Per-key delay and timing controls
 - Pause between cycles and post-Enter delay
+ - Note: very high cps values may be limited by the target application or OS; use the slider to find a stable speed.
 
 ### 🖱️ Other Features
 - Real-time status monitoring
@@ -56,6 +59,7 @@ Automated character generation and key spamming tool for Windows, with a modern,
 2. Configure your settings in the tabbed interface:
    - Character Settings: choose which characters to generate
    - Formatting: set up dashes and spaces
+   • Advanced: enable Advanced mode to use Pattern and Per-gap entries
    - Deletion: configure auto-deletion and timing
    - Timing: adjust per-key delay, typing speed, pause between cycles, and post-Enter delay
    - Controls: set activation mode and key binding
@@ -76,6 +80,12 @@ Automated character generation and key spamming tool for Windows, with a modern,
 - Add dashes every N characters
 - Add spaces every N characters
 - Customize spacing frequency
+ - Advanced Pattern Tokens:
+    • Digit-only tokens are interpreted as numeric placeholders or counts. Example: `1111` → 4 placeholders, `4` → group size 4.
+    • Tokens containing letters or symbols are treated as literal strings and will be inserted unchanged.
+ - Per-gap Entries:
+    • When enabled, a separate text box appears for each gap. Values typed into those boxes are used verbatim for that gap.
+    • When Per-gap Entries is enabled, the "Characters per gap" spinner is ignored — put numeric group sizes in the Pattern field (e.g., `4-4-4`) if you need numeric placeholders.
 
 ### Deletion
 - Auto-delete after typing
