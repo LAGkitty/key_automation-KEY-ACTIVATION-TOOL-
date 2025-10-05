@@ -40,6 +40,9 @@ class KeyAutomationApp:
         self.dash_frequency = tk.IntVar(value=4)
         self.dash_gap_count = tk.IntVar(value=3)  # How many gaps to create
         self.space_frequency = tk.IntVar(value=0)
+        # Advanced dash pattern: allow explicit group sizes (e.g. "2-5-4-6")
+        self.use_dash_pattern = tk.BooleanVar(value=False)
+        self.dash_pattern = tk.StringVar(value="")
         
         # Deletion settings
         self.auto_delete = tk.BooleanVar(value=True)
@@ -82,6 +85,14 @@ class KeyAutomationApp:
         self.setup_ui()
         # attach variable traces that rely on widgets created in setup_ui
         self._attach_var_traces()
+
+        # Rebuild per-gap entries when the number of gaps changes or per-gap toggle is changed
+        try:
+            self.dash_gap_count.trace_add('write', lambda *a: self._rebuild_pergap_entries())
+            # if use_per_gap_entries is created later, also trace it when present
+            # (we rely on the checkbutton command as primary)
+        except Exception:
+            pass
 
         self.start_key_listener()
         # Speed up pyautogui internal pause so high CPS possible
@@ -161,24 +172,248 @@ class KeyAutomationApp:
         # Spacing options
         spacing_group = ttk.LabelFrame(parent, text="Spacing & Formatting", padding=10)
         spacing_group.pack(fill='x', padx=10, pady=5)
-        
+
         ttk.Checkbutton(spacing_group, text="Use dashes (-)", variable=self.use_dashes).pack(anchor='w')
-        
+
+        # Characters-per-gap (kept available but will be disabled when per-gap is active)
         dash_frame = ttk.Frame(spacing_group)
         dash_frame.pack(fill='x', pady=(5, 0))
         ttk.Label(dash_frame, text="Characters per gap:").pack(side='left')
-        ttk.Spinbox(dash_frame, from_=2, to=10, textvariable=self.dash_frequency, width=5).pack(side='left', padx=(5, 5))
-        
+        self.dash_frequency_spin = ttk.Spinbox(dash_frame, from_=1, to=50, textvariable=self.dash_frequency, width=6)
+        self.dash_frequency_spin.pack(side='left', padx=(5, 5))
+
+        # Number of gaps
         gap_frame = ttk.Frame(spacing_group)
         gap_frame.pack(fill='x', pady=(5, 0))
         ttk.Label(gap_frame, text="Number of gaps:").pack(side='left')
-        ttk.Spinbox(gap_frame, from_=1, to=10, textvariable=self.dash_gap_count, width=5).pack(side='left', padx=(5, 5))
-        
+        ttk.Spinbox(gap_frame, from_=1, to=50, textvariable=self.dash_gap_count, width=6).pack(side='left', padx=(5, 5))
+
+        # Space frequency
         space_frame = ttk.Frame(spacing_group)
         space_frame.pack(fill='x', pady=(5, 0))
         ttk.Label(space_frame, text="Space every").pack(side='left')
-        ttk.Spinbox(space_frame, from_=0, to=20, textvariable=self.space_frequency, width=5).pack(side='left', padx=(5, 5))
+        ttk.Spinbox(space_frame, from_=0, to=50, textvariable=self.space_frequency, width=6).pack(side='left', padx=(5, 5))
         ttk.Label(space_frame, text="characters (0 = no spaces)").pack(side='left')
+
+        # Advanced mode controls (hidden until Advanced mode enabled)
+        self.advanced_mode = tk.BooleanVar(value=False)
+        adv_frame = ttk.Frame(spacing_group)
+        adv_frame.pack(fill='x', pady=(8,0))
+        ttk.Checkbutton(adv_frame, text="Advanced mode", variable=self.advanced_mode, command=self._toggle_advanced_ui).pack(side='left')
+
+        # Pattern controls (shown in advanced)
+        self.pattern_frame = ttk.Frame(spacing_group)
+        ttk.Checkbutton(self.pattern_frame, text="Use dash pattern (advanced)", variable=self.use_dash_pattern).pack(side='left')
+        ttk.Label(self.pattern_frame, text="Pattern:").pack(side='left', padx=(10,4))
+        ttk.Entry(self.pattern_frame, textvariable=self.dash_pattern, width=24).pack(side='left')
+        self.helper_label = ttk.Label(spacing_group, text=("Enter group tokens separated by '-' (e.g. 11-11111-1111 or jHU-1111-tfgt).\n"
+                                                "Digits-only tokens are counts/placeholders; tokens with letters/symbols are literal."),
+                                     font=('Arial', 8), foreground='#666666')
+
+        # Per-gap toggle (shown in advanced)
+        self.use_per_gap_entries = tk.BooleanVar(value=False)
+        self.pergap_toggle_frame = ttk.Frame(spacing_group)
+        ttk.Checkbutton(self.pergap_toggle_frame, text="Use per-gap entries (one box per gap)", variable=self.use_per_gap_entries, command=self._on_pergap_toggle).pack(side='left')
+        # Helper label clarifying behavior when per-gap entries are enabled
+        self.pergap_helper = ttk.Label(self.pergap_toggle_frame, text=("When Per-gap entries is enabled, 'Characters per gap' is ignored.\n"
+                                                                         "You must put numeric group sizes in the Pattern field (e.g. 4-4-4) or use literal tokens."),
+                                       font=('Arial', 8), foreground='#666666')
+        self.pergap_helper.pack(side='left', padx=(10,0))
+
+        # Per-gap container: create canvas and inner frame but don't pack them until needed
+        self.per_gap_container = ttk.Frame(spacing_group)
+        self.per_gap_canvas = tk.Canvas(self.per_gap_container, height=90)
+        self.per_gap_hscroll = ttk.Scrollbar(self.per_gap_container, orient='horizontal', command=self.per_gap_canvas.xview)
+        self.per_gap_canvas.configure(xscrollcommand=self.per_gap_hscroll.set)
+        self.per_gap_inner = ttk.Frame(self.per_gap_canvas)
+        self.per_gap_window = self.per_gap_canvas.create_window((0,0), window=self.per_gap_inner, anchor='nw')
+
+        def _update_pergap_scrollregion(event=None):
+            try:
+                self.per_gap_canvas.configure(scrollregion=self.per_gap_canvas.bbox('all'))
+                reqw = self.per_gap_inner.winfo_reqwidth()
+                self.per_gap_canvas.itemconfigure(self.per_gap_window, width=reqw)
+            except Exception:
+                pass
+
+        self.per_gap_inner.bind('<Configure>', _update_pergap_scrollregion)
+        self.per_gap_vars = []
+
+        # Preview area (bottom of formatting group)
+        self.preview_frame = ttk.Frame(spacing_group)
+        ttk.Button(self.preview_frame, text="Preview", command=lambda: self._show_preview()).pack(side='left')
+        self.preview_text = tk.Text(self.preview_frame, height=2, wrap='none')
+        self.preview_text.pack(side='left', fill='x', expand=True, padx=(8,0))
+        self.preview_text.config(state='disabled')
+
+        # attach traces
+        try:
+            self.dash_gap_count.trace_add('write', lambda *a: self._rebuild_pergap_entries())
+            self.use_per_gap_entries.trace_add('write', lambda *a: self._on_pergap_toggle())
+        except Exception:
+            pass
+
+        # initially hide advanced parts
+        self._toggle_advanced_ui()
+
+    def build_text_from_settings(self, for_preview: bool = False) -> str:
+        """Build the text string based on current settings (used by preview and typing).
+
+        Supports advanced dash pattern where tokens can be numeric placeholders or literal tokens.
+        """
+        out = []
+        if self.use_dashes.get():
+            if self.use_dash_pattern.get() and self.dash_pattern.get().strip():
+                raw_tokens = [t for t in self.dash_pattern.get().split('-') if t != '']
+                # interpret tokens: digit-only -> placeholders (either repeated '1's or integer count), else literal
+                tokens = []
+                for tok in raw_tokens:
+                    if tok.isdigit():
+                        # if composed of only '1' characters, treat length as number of placeholders
+                        if set(tok) == {'1'}:
+                            tokens.append(('placeholders', len(tok)))
+                        else:
+                            # otherwise interpret token as integer count
+                            try:
+                                cnt = int(tok)
+                                tokens.append(('placeholders', cnt))
+                            except Exception:
+                                tokens.append(('literal', tok))
+                    else:
+                        tokens.append(('literal', tok))
+
+                # Repeat/rotate tokens to reach dash_gap_count groups
+                # Repeat/rotate tokens to reach dash_gap_count groups
+                num_gaps = max(1, self.dash_gap_count.get())
+                for i in range(num_gaps):
+                    # If per-gap entries are enabled and present, prefer them
+                    if getattr(self, 'use_per_gap_entries', tk.BooleanVar(value=False)).get() and self.per_gap_vars:
+                        if i < len(self.per_gap_vars):
+                            val = self.per_gap_vars[i].get()
+                            if val:
+                                out.append(val)
+                                if i < num_gaps - 1:
+                                    out.append('-')
+                                continue
+
+                    token = tokens[i % len(tokens)] if tokens else ('placeholders', self.dash_frequency.get())
+                    if token[0] == 'literal':
+                        out.append(token[1])
+                    else:
+                        for _ in range(int(token[1])):
+                            out.append(self.generate_character())
+                    if i < num_gaps - 1:
+                        out.append('-')
+            else:
+                chars_per_gap = self.dash_frequency.get()
+                num_gaps = self.dash_gap_count.get()
+                for gap_num in range(num_gaps):
+                    for _ in range(chars_per_gap):
+                        out.append(self.generate_character())
+                    if gap_num < num_gaps - 1:
+                        out.append('-')
+        else:
+            seq_len = self.get_sequence_length()
+            for i in range(seq_len):
+                out.append(self.generate_character())
+                if self.space_frequency.get() > 0 and (i + 1) % self.space_frequency.get() == 0:
+                    out.append(' ')
+
+        return ''.join(out)
+
+    def _show_preview(self):
+        try:
+            sample = self.build_text_from_settings(for_preview=True)
+            if not hasattr(self, 'preview_text'):
+                return
+            self.preview_text.config(state='normal')
+            self.preview_text.delete('1.0', 'end')
+            self.preview_text.insert('1.0', sample)
+            self.preview_text.config(state='disabled')
+        except Exception:
+            pass
+
+    def _toggle_advanced_ui(self, *args):
+        """Show or hide advanced formatting controls based on the advanced_mode toggle."""
+        try:
+            if self.advanced_mode.get():
+                # show helper label, pattern frame, per-gap toggle and preview
+                self.helper_label.pack(fill='x', pady=(6,0))
+                self.pattern_frame.pack(fill='x', pady=(6,0))
+                self.pergap_toggle_frame.pack(fill='x', pady=(6,0))
+                # build per-gap entries if enabled
+                if self.use_per_gap_entries.get():
+                    self._rebuild_pergap_entries()
+                # show preview at bottom
+                self.preview_frame.pack(fill='x', pady=(8,0))
+            else:
+                # hide advanced elements
+                try:
+                    self.helper_label.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    self.pattern_frame.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    self.pergap_toggle_frame.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    self.per_gap_container.pack_forget()
+                except Exception:
+                    pass
+                try:
+                    self.preview_frame.pack_forget()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _on_pergap_toggle(self, *args):
+        """When per-gap entries are toggled on, require dash pattern and build entries."""
+        try:
+            if self.use_per_gap_entries.get():
+                # enforce using dash pattern when per-gap entries are used
+                self.use_dash_pattern.set(True)
+                # ensure advanced UI is visible
+                if not self.advanced_mode.get():
+                    self.advanced_mode.set(True)
+                    self._toggle_advanced_ui()
+                # show container and rebuild entries
+                self.per_gap_container.pack(fill='x', pady=(6,0))
+                self._rebuild_pergap_entries()
+            else:
+                # hide container
+                try:
+                    self.per_gap_container.pack_forget()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def _rebuild_pergap_entries(self, *args):
+        """Create Entry widgets for each gap when per-gap mode is enabled."""
+        try:
+            # clear existing entries
+            for child in self.per_gap_container.winfo_children():
+                child.destroy()
+            self.per_gap_vars = []
+
+            if not getattr(self, 'use_per_gap_entries', tk.BooleanVar(value=False)).get():
+                return
+
+            num = max(1, int(self.dash_gap_count.get()))
+            for i in range(num):
+                v = tk.StringVar(value='')
+                self.per_gap_vars.append(v)
+                f = ttk.Frame(self.per_gap_container)
+                f.pack(side='left', padx=4)
+                ttk.Label(f, text=f"Gap {i+1}:").pack(side='top')
+                ttk.Entry(f, textvariable=v, width=10).pack(side='top')
+        except Exception:
+            pass
 
     # Press Enter option was moved to the Deletion tab to group with Auto-delete
         
@@ -276,6 +511,8 @@ class KeyAutomationApp:
     • If 'Auto-delete' is enabled the tool will delete the typed text instead of sending Enter.
     • Typing Speed slider uses a smooth logarithmic scale up to 10,000 cps — lower values are easier to observe; very high speeds may be limited by the OS and target application.
     • Pause between cycles and post-Enter delay are configurable in the Timing tab.
+    • Advanced mode provides a Pattern field and Per-gap Entries. When Per-gap Entries is enabled, the "Characters per gap" control is ignored and per-gap text boxes are used verbatim.
+    • The Preview button shows the exact string the tool will type. The typing routine now uses the same builder as Preview so the output should match what you see in Preview.
 
 4. TIPS:
     • Start with a moderate typing speed and small delete delay while you test.
@@ -474,25 +711,28 @@ Enjoy and be careful — the automation will send keystrokes to whichever window
         disable_auto_delete: when True, skip auto-deletion even if the UI checkbox is set.
         """
         try:
-            # Build buffer text to type to speed things up (use keyboard.write which is faster for bulk)
-            out = []
-            if self.use_dashes.get():
-                chars_per_gap = self.dash_frequency.get()
-                num_gaps = self.dash_gap_count.get()
-                for gap_num in range(num_gaps):
-                    for _ in range(chars_per_gap):
+            # Use the same builder as Preview so actual typing matches what preview shows
+            try:
+                text_to_type = self.build_text_from_settings(for_preview=False)
+            except Exception:
+                # Fallback: build the output manually (legacy logic)
+                out = []
+                if self.use_dashes.get():
+                    chars_per_gap = self.dash_frequency.get()
+                    num_gaps = self.dash_gap_count.get()
+                    for gap_num in range(num_gaps):
+                        for _ in range(chars_per_gap):
+                            out.append(self.generate_character())
+                        if gap_num < num_gaps - 1:
+                            out.append('-')
+                else:
+                    seq_len = self.get_sequence_length()
+                    for i in range(seq_len):
                         out.append(self.generate_character())
-                    if gap_num < num_gaps - 1:
-                        out.append('-')
-            else:
-                seq_len = self.get_sequence_length()
-                for i in range(seq_len):
-                    out.append(self.generate_character())
-                    if self.space_frequency.get() > 0 and (i + 1) % self.space_frequency.get() == 0:
-                        out.append(' ')
+                        if self.space_frequency.get() > 0 and (i + 1) % self.space_frequency.get() == 0:
+                            out.append(' ')
 
-            # convert to string, writing keys via keyboard for speed
-            text_to_type = ''.join(out)
+                text_to_type = ''.join(out)
             if text_to_type:
                 try:
                     # keyboard.write tends to be faster than pyautogui.write for bulk
