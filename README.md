@@ -1,63 +1,69 @@
+
 # Key Automation Tool
 
-A comprehensive Python application for automated key spamming and character generation, designed for entertainment purposes.
+Automated character generation and key spamming tool for Windows, with a modern, compact UI and advanced timing controls.
 
 ## Features
 
 ### 🎯 Character Generation
-- **Letters**: A-Z, a-z
-- **Numbers**: 0-9
-- **Symbols**: !@#$%^&*()_+-=[]{}|;':",./<>?
-- **Arrow Keys**: ↑↓←→
-- **Custom Characters**: Define your own character set
-- **Exclude Characters**: Remove specific characters from generation
+- Letters (A-Z, a-z)
+- Numbers (0-9)
+- Symbols (!@#$%^&*()_+-=[]{}|;':",./<>?)
+- Arrow Keys (↑↓←→)
+- Custom Characters: define your own set
+- Exclude Characters: remove specific characters
 
-### 🎨 Formatting Options
-- **Dashes**: Add dashes every N characters
-- **Spaces**: Add spaces every N characters
-- **Customizable frequency** for both options
+### 🎨 Formatting
+- Add dashes or spaces every N characters
+- Customizable frequency for both options
 
-### 🗑️ Deletion Features
-- **Auto-delete**: Automatically delete after typing
-- **Character deletion**: Delete N characters with backspace
-- **Word deletion**: Use Ctrl+Backspace to delete entire words
-- **Configurable deletion count** and timing
+### 🗑️ Deletion
+- Auto-delete: automatically delete after typing
+- Character deletion: delete N characters with backspace
+- Word deletion: use Ctrl+Backspace to delete whole words
+- Configurable deletion count and timing
 
 ### ⚙️ Control Modes
-- **Hold Mode**: Press and hold activation key to run
-- **Toggle Mode**: Press once to start/stop
-- **Customizable activation key** (F1-F12, Ctrl, Alt, Shift, etc.)
+- Hold Mode: press and hold activation key to run
+- Toggle Mode: press once to start/stop
+- Single Mode: press once to type a single sequence (auto-delete is disabled for single runs)
+- Customizable activation key (F1-F12, Insert, Home, End, etc.)
 
-### 🎮 Advanced Features
-- **Visual keyboard layout** window
-- **Retry cycles**: Automatically restart after N operations
-- **Timing controls**: Adjustable delays for all operations
-- **Real-time status** monitoring
+### ⚡ Timing & Speed
+- Typing speed slider: smooth logarithmic scale up to 10,000 cps
+- Per-key delay and timing controls
+- Pause between cycles and post-Enter delay
+
+### 🖱️ Other Features
+- Real-time status monitoring
+- Robust error handling
 
 ## Installation
 
 1. Install Python 3.7 or higher
 2. Install required dependencies:
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 ## Usage
 
 1. Run the application:
-```bash
-python key_automation.py
-```
+   ```bash
+   python key_automation.py
+   ```
 
 2. Configure your settings in the tabbed interface:
-   - **Character Settings**: Choose which characters to generate
-   - **Formatting**: Set up dashes and spaces
-   - **Deletion & Timing**: Configure auto-deletion and timing
-   - **Controls**: Set activation mode and key binding
+   - Character Settings: choose which characters to generate
+   - Formatting: set up dashes and spaces
+   - Deletion: configure auto-deletion and timing
+   - Timing: adjust per-key delay, typing speed, pause between cycles, and post-Enter delay
+   - Controls: set activation mode and key binding
 
 3. Use the activation key to start/stop the automation:
-   - **Hold Mode**: Hold the activation key to run
-   - **Toggle Mode**: Press once to start, press again to stop
+   - Hold Mode: hold the activation key to run
+   - Toggle Mode: press once to start, press again to stop
+   - Single Mode: press once to type a single sequence (auto-delete is disabled for single runs)
 
 ## Configuration
 
@@ -71,32 +77,26 @@ python key_automation.py
 - Add spaces every N characters
 - Customize spacing frequency
 
-### Deletion Options
+### Deletion
 - Auto-delete after typing
 - Choose between character or word deletion
 - Set deletion count and timing
-- Configure retry cycles
+
+### Timing
+- Typing speed slider (logarithmic, up to 10,000 cps)
+- Per-key delay
+- Pause between cycles
+- Post-Enter delay
 
 ### Controls
-- Choose between hold or toggle mode
+- Hold, Toggle, or Single mode
 - Select activation key from dropdown
-- View keyboard layout for reference
 
-## Safety Features
+## Safety & Disclaimer
 
-- **Entertainment purposes only**: This tool is designed for entertainment and demonstration purposes
-- **Configurable timing**: All operations have adjustable delays to prevent system overload
-- **Error handling**: Robust error handling prevents crashes
-- **Easy stop**: Multiple ways to stop the automation
+- Entertainment purposes only: This tool is designed for entertainment and demonstration purposes
+- Configurable timing: All operations have adjustable delays to prevent system overload
+- Error handling: Robust error handling prevents crashes
+- Easy stop: Multiple ways to stop the automation
 
-## Technical Details
-
-- Built with Python tkinter for the GUI
-- Uses pyautogui for key simulation
-- pynput for global key listening
-- Threading for non-blocking automation
-- Cross-platform compatibility
-
-## Disclaimer
-
-This tool is created for entertainment and educational purposes only. Users are responsible for ensuring they comply with all applicable laws and terms of service of any software or games they use this tool with.
+**Disclaimer:** This tool is created for entertainment and educational purposes only. Users are responsible for ensuring they comply with all applicable laws and terms of service of any software or games they use this tool with.
